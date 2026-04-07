@@ -1,0 +1,120 @@
+name: E2E Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this run was triggered
+        required: false
+        default: manual workflow dispatch
+      suite:
+        description: E2E suite to run (keep smoke for scheduled runs)
+        required: false
+        default: smoke
+      source:
+        description: Trigger source
+        required: false
+        default: manual
+  repository_dispatch:
+    types: [run-smoke-e2e]
+
+concurrency:
+  group: e2e-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    env:
+      REPO_OWNER: ${{ vars.ZENOS_REPO_OWNER || 'zenos-work' }}
+      FRONTEND_REPO: ${{ vars.ZENOS_FRONTEND_REPO || 'zenos-frontend' }}
+      BACKEND_REPO: ${{ vars.ZENOS_BACKEND_REPO || 'zenos-backend' }}
+      DB_REPO: ${{ vars.ZENOS_DB_REPO || 'zenos-db' }}
+      E2E_SUITE: ${{ inputs.suite || github.event.client_payload.suite || 'smoke' }}
+      E2E_REASON: ${{ inputs.reason || github.event.client_payload.reason || 'cloudflare worker trigger' }}
+      E2E_REPO_ROOT: ${{ github.workspace }}/zenos-e2e
+      GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      E2E_REPORT_OUTPUT_DIR: ${{ github.workspace }}/zenos-e2e/artifacts/email
+
+    steps:
+      - name: Checkout zenos-e2e
+        uses: actions/checkout@v4
+        with:
+          path: zenos-e2e
+
+      - name: Checkout zenos-frontend
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPO_OWNER }}/${{ env.FRONTEND_REPO }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          path: zenos-frontend
+
+      - name: Checkout zenos-backend
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPO_OWNER }}/${{ env.BACKEND_REPO }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          path: zenos-backend
+
+      - name: Checkout zenos-db
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPO_OWNER }}/${{ env.DB_REPO }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          path: zenos-db
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install E2E dependencies
+        working-directory: zenos-e2e/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run E2E suite
+        id: run_e2e
+        working-directory: zenos-e2e/scripts
+        run: |
+          set +e
+          ./run-e2e.sh --ci --suite "${E2E_SUITE}"
+          exit_code=$?
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
+          echo "E2E_EXIT_CODE=${exit_code}" >> "$GITHUB_ENV"
+          set -e
+
+      - name: Build email report body
+        if: always()
+        run: node zenos-e2e/scripts/ci/generate-email-report.mjs
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ env.E2E_SUITE }}
+          path: |
+            zenos-e2e/e2e/playwright-report
+            zenos-e2e/.local-dev/e2e-logs
+            zenos-e2e/artifacts/email
+          retention-days: 14
+
+      - name: Send report email via Cloudflare Worker
+        if: always()
+        env:
+          CF_E2E_WORKER_URL: ${{ secrets.CF_E2E_WORKER_URL }}
+          CF_E2E_NOTIFY_SECRET: ${{ secrets.CF_E2E_NOTIFY_SECRET }}
+        run: node zenos-e2e/scripts/ci/notify-worker.mjs
+
+      - name: Mark workflow failed if tests failed
+        if: always()
+        run: |
+          if [ "${E2E_EXIT_CODE}" != "0" ]; then
+            echo "Smoke suite failed with exit code ${E2E_EXIT_CODE}"
+            exit 1
+          fi
