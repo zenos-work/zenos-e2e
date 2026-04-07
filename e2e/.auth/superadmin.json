@@ -1,0 +1,18 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "refresh_token",
+          "value": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYjExNGM4OTItZTY5OS00OGE0LTk5OTEtY2YyNzI3MWRhMzhlIiwgInR5cGUiOiAicmVmcmVzaCIsICJleHAiOiAxNzc2MTQ3MTk2fQ.isGC8QcEvEtYqdAxtQY9b3pnc53-1XpNC_cCSXNEl1A"
+        },
+        {
+          "name": "access_token",
+          "value": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYjExNGM4OTItZTY5OS00OGE0LTk5OTEtY2YyNzI3MWRhMzhlIiwgImVtYWlsIjogImUyZS5zdXBlcmFkbWluQHplbm9zLmxvY2FsIiwgInJvbGUiOiAiU1VQRVJBRE1JTiIsICJleHAiOiAxNzc1NTQzMjk2fQ.8SsOku4oQT4IRTpJN-qpvk-rbZXCtrT9iriCEpXxuCk"
+        }
+      ]
+    }
+  ]
+}

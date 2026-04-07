@@ -1,0 +1,28 @@
+{
+  "name": "@zenos/e2e",
+  "version": "1.0.0",
+  "description": "Real-browser end-to-end + integration test suite for the Zenos platform",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:auth": "playwright test --grep @auth",
+    "test:articles": "playwright test --grep @articles",
+    "test:social": "playwright test --grep @social",
+    "test:admin": "playwright test --grep @admin",
+    "test:ui": "playwright test --grep @ui",
+    "test:api": "playwright test --grep @api",
+    "test:ci": "playwright test --grep @smoke --reporter=github,html",
+    "test:full": "playwright test --reporter=html",
+    "report": "playwright show-report playwright-report",
+    "install:browsers": "playwright install --with-deps chromium firefox",
+    "codegen": "playwright codegen http://localhost:5173"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "dotenv": "^16.4.0"
+  }
+}
