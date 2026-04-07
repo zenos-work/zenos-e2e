@@ -95,6 +95,15 @@ if [[ ! -f "${BACKEND_DIR}/wrangler.jsonc" ]]; then
   exit 1
 fi
 
+# ── Clean up stale auth state for fresh start ─────────────────────────────────
+AUTH_DIR="${E2E_DIR}/.auth"
+if [[ -d "${AUTH_DIR}" ]]; then
+  echo "🧹  Removing stale auth state: ${AUTH_DIR}"
+  rm -rf "${AUTH_DIR}"
+fi
+mkdir -p "${AUTH_DIR}"
+echo "✅  Fresh auth directory ready"
+
 # ── Export env vars ───────────────────────────────────────────────────────────
 export FRONTEND_URL="${FRONTEND_URL:-http://localhost:5173}"
 export VITE_API_BASE_URL="${VITE_API_BASE_URL:-http://127.0.0.1:8787}"
