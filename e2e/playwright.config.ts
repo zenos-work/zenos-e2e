@@ -32,7 +32,7 @@ const SUPERADMIN_AUTH_STATE_PATH = path.join(__dirname, '.auth', 'superadmin.jso
 const AUTH_STATE_PATH = AUTHOR_AUTH_STATE_PATH;
 const ADMIN_AUTH_STATE_PATH = SUPERADMIN_AUTH_STATE_PATH;
 
-const HEADLESS = process.env.CI === 'true' || process.env.HEADLESS === 'true';
+const HEADLESS = process.env.CI === 'true' || process.env.HEADLESS === 'true' || !process.env.DISPLAY;
 const ENABLE_ROLE_PROJECTS = process.env.E2E_ENABLE_ROLE_PROJECTS === 'true';
 
 export {

@@ -14,6 +14,8 @@
  *   - `dismissToast`    — dismiss toast helper
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { test as base, Page, expect } from '@playwright/test';
 import { ZenosApiClient, ZenosUser, ZenosArticle, UserRole } from '../utils/api-client';
 
@@ -24,6 +26,13 @@ const IS_CI = process.env.CI === 'true';
 const TOKEN_MINT_ATTEMPTS = 4;
 const TOKEN_MINT_RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
+const AUTH_STATE_PATHS: Record<UserRole, string> = {
+  READER: path.join(__dirname, '..', '.auth', 'reader.json'),
+  AUTHOR: path.join(__dirname, '..', '.auth', 'author.json'),
+  APPROVER: path.join(__dirname, '..', '.auth', 'approver.json'),
+  SUPERADMIN: path.join(__dirname, '..', '.auth', 'superadmin.json'),
+};
+
 function isRetryableMintFailure(status: number, body: string): boolean {
   return TOKEN_MINT_RETRYABLE_STATUS.has(status)
     || /worker restarted|timeout|temporar|try again|unavailable/i.test(body);
@@ -31,6 +40,54 @@ function isRetryableMintFailure(status: number, body: string): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readRoleTokensFromAuthState(role: UserRole): { accessToken: string | null; refreshToken: string | null } | null {
+  const authPath = AUTH_STATE_PATHS[role];
+  if (!fs.existsSync(authPath)) return null;
+
+  const raw = fs.readFileSync(authPath, 'utf8');
+  const parsed = JSON.parse(raw) as {
+    origins?: Array<{
+      origin?: string;
+      localStorage?: Array<{ name?: string; value?: string }>;
+    }>;
+  };
+
+  const storage = parsed.origins?.flatMap((origin) => origin.localStorage ?? []) ?? [];
+  const accessToken = storage.find((item) => item.name === 'access_token')?.value ?? null;
+  const refreshToken = storage.find((item) => item.name === 'refresh_token')?.value ?? null;
+
+  if (!accessToken && !refreshToken) {
+    return null;
+  }
+
+  return { accessToken, refreshToken };
+}
+
+async function refreshAccessToken(
+  request: Parameters<typeof ZenosApiClient.forRole>[0],
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string | null } | null> {
+  const refreshRes = await request.post(`${API_BASE_URL}/auth/refresh`, {
+    headers: { 'Content-Type': 'application/json' },
+    data: { refresh_token: refreshToken },
+    timeout: 20_000,
+  });
+
+  if (!refreshRes.ok()) {
+    return null;
+  }
+
+  const payload = await refreshRes.json() as { access_token?: string; refresh_token?: string };
+  if (!payload.access_token) {
+    return null;
+  }
+
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token ?? refreshToken,
+  };
 }
 
 async function mintRoleTokens(
@@ -113,11 +170,13 @@ async function seedAuthorSessionIfMissing(page: Page, request: Parameters<typeof
     return;
   }
 
-  if (!IS_CI) {
+  const payload = IS_CI
+    ? await mintRoleTokens(request, 'AUTHOR')
+    : readRoleTokensFromAuthState('AUTHOR');
+
+  if (!payload) {
     return;
   }
-
-  const payload = await mintRoleTokens(request, 'AUTHOR');
 
   await page.evaluate(([access, refresh]) => {
     sessionStorage.setItem('access_token', access);
@@ -149,7 +208,21 @@ async function makeRoleClient(
   request: Parameters<typeof ZenosApiClient.forRole>[0],
   role: UserRole,
 ): Promise<ZenosApiClient> {
-  return ZenosApiClient.forRole(request, API_BASE_URL, role);
+  try {
+    return await ZenosApiClient.forRole(request, API_BASE_URL, role);
+  } catch (error) {
+    const cached = readRoleTokensFromAuthState(role);
+    if (cached?.refreshToken) {
+      const refreshed = await refreshAccessToken(request, cached.refreshToken);
+      if (refreshed?.accessToken) {
+        return new ZenosApiClient(request, API_BASE_URL, refreshed.accessToken);
+      }
+    }
+    if (cached?.accessToken) {
+      return new ZenosApiClient(request, API_BASE_URL, cached.accessToken);
+    }
+    throw error;
+  }
 }
 
 type ZenosFixtures = {
@@ -199,21 +272,8 @@ export const test = base.extend<ZenosFixtures>({
   },
 
   /** API client for the currently authenticated user (AUTHOR role in default project) */
-  apiClient: async ({ page, request }, use) => {
-    await seedAuthorSessionIfMissing(page, request);
-
-    let client: ZenosApiClient;
-    try {
-      const token = await getToken(page);
-      client = new ZenosApiClient(request, API_BASE_URL, token);
-    } catch (err) {
-      if (!IS_CI) {
-        throw err;
-      }
-      client = await makeRoleClient(request, 'AUTHOR');
-    }
-
-    await use(client);
+  apiClient: async ({ request }, use) => {
+    await use(await makeRoleClient(request, 'AUTHOR'));
   },
 
   /** APPROVER role client — uses /auth/test/token in CI or falls back to the current session */

@@ -427,6 +427,227 @@ export class ZenosApiClient {
     }));
   }
 
+  async getSocialAccounts(): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/social/accounts`, { headers: this.authHeaders }));
+  }
+
+  async connectSocialAccount(data: {
+    provider: string;
+    provider_uid: string;
+    handle?: string;
+    access_token?: string;
+    refresh_token?: string;
+    token_expires_at?: number;
+  }): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/social/accounts/connect`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async disconnectSocialAccount(provider: string): Promise<ApiResponse> {
+    return wrap(await this.request.delete(`${this.baseUrl}/api/social/accounts/${provider}`, {
+      headers: this.authHeaders,
+    }));
+  }
+
+  async getShareUrl(articleId: string, provider: string, articleUrl: string, title?: string): Promise<ApiResponse> {
+    const qs = new URLSearchParams({ article_url: articleUrl, ...(title ? { title } : {}) }).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/social/share-url/${articleId}/${provider}?${qs}`, {
+      headers: this.authHeaders,
+    }));
+  }
+
+  // ─── Workflows ───────────────────────────────────────────────────────────
+
+  async createWorkflow(data: {
+    name: string;
+    description?: string;
+    status?: string;
+    definition?: Record<string, unknown>;
+    org_id?: string;
+  }): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/workflows`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async getWorkflows(params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/workflows?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async getWorkflow(workflowId: string): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/workflows/${workflowId}`, { headers: this.authHeaders }));
+  }
+
+  async updateWorkflow(workflowId: string, data: Record<string, unknown>): Promise<ApiResponse> {
+    return wrap(await this.request.put(`${this.baseUrl}/api/workflows/${workflowId}`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async deleteWorkflow(workflowId: string): Promise<ApiResponse> {
+    return wrap(await this.request.delete(`${this.baseUrl}/api/workflows/${workflowId}`, { headers: this.authHeaders }));
+  }
+
+  async getWorkflowVersions(workflowId: string): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/workflows/${workflowId}/versions`, { headers: this.authHeaders }));
+  }
+
+  async createWorkflowVersion(workflowId: string, changelog?: string): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/workflows/${workflowId}/versions`, {
+      headers: this.authHeaders,
+      data: { changelog: changelog ?? '' },
+    }));
+  }
+
+  async restoreWorkflowVersion(workflowId: string, versionNumber: number): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/workflows/${workflowId}/versions/${versionNumber}/restore`, {
+      headers: this.authHeaders,
+      data: {},
+    }));
+  }
+
+  // ─── Community ───────────────────────────────────────────────────────────
+
+  async getCommunitySpaces(params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/community?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async createCommunitySpace(data: {
+    name: string;
+    slug: string;
+    org_id?: string;
+    description?: string;
+    space_type?: string;
+  }): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/community`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async getCommunitySpace(spaceId: string): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/community/${spaceId}`, { headers: this.authHeaders }));
+  }
+
+  async deleteCommunitySpace(spaceId: string): Promise<ApiResponse> {
+    return wrap(await this.request.delete(`${this.baseUrl}/api/community/${spaceId}`, { headers: this.authHeaders }));
+  }
+
+  async getCommunityMembers(spaceId: string): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/community/${spaceId}/members`, { headers: this.authHeaders }));
+  }
+
+  async joinCommunitySpace(spaceId: string): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/community/${spaceId}/members`, {
+      headers: this.authHeaders,
+      data: {},
+    }));
+  }
+
+  async leaveCommunitySpace(spaceId: string): Promise<ApiResponse> {
+    return wrap(await this.request.delete(`${this.baseUrl}/api/community/${spaceId}/members`, { headers: this.authHeaders }));
+  }
+
+  async getCommunityPosts(spaceId: string, params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/community/${spaceId}/posts?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async createCommunityPost(spaceId: string, data: {
+    title: string;
+    body: string;
+    post_type?: string;
+    parent_id?: string;
+  }): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/community/${spaceId}/posts`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async getCommunityReplies(spaceId: string, postId: string): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/community/${spaceId}/posts/${postId}/replies`, { headers: this.authHeaders }));
+  }
+
+  async likeCommunityPost(spaceId: string, postId: string): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/community/${spaceId}/posts/${postId}/like`, {
+      headers: this.authHeaders,
+      data: {},
+    }));
+  }
+
+  // ─── Marketplace ────────────────────────────────────────────────────────
+
+  async getMarketplaceItems(params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/marketplace?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async createMarketplaceItem(data: {
+    name: string;
+    slug: string;
+    short_desc?: string;
+    category?: string;
+    item_type?: string;
+    price_cents?: number;
+    currency?: string;
+  }): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/marketplace`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async getMarketplaceItem(itemId: string): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/marketplace/${itemId}`, { headers: this.authHeaders }));
+  }
+
+  async deleteMarketplaceItem(itemId: string): Promise<ApiResponse> {
+    return wrap(await this.request.delete(`${this.baseUrl}/api/marketplace/${itemId}`, { headers: this.authHeaders }));
+  }
+
+  async publishMarketplaceItem(itemId: string): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/marketplace/${itemId}/publish`, {
+      headers: this.authHeaders,
+      data: {},
+    }));
+  }
+
+  async purchaseMarketplaceItem(itemId: string, data: { price_paid_cents?: number; currency?: string } = {}): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/marketplace/${itemId}/purchases`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async getMarketplacePurchases(itemId: string, params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/marketplace/${itemId}/purchases?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async getMyMarketplacePurchases(params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/marketplace/my-purchases?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async getMarketplaceReviews(itemId: string, params: Record<string, string> = {}): Promise<ApiResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return wrap(await this.request.get(`${this.baseUrl}/api/marketplace/${itemId}/reviews?${qs}`, { headers: this.authHeaders }));
+  }
+
+  async createMarketplaceReview(itemId: string, data: { rating: number; body?: string }): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/marketplace/${itemId}/reviews`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
   // ─── Series ───────────────────────────────────────────────────────────────
 
   async createSeries(data: { title: string; description?: string }): Promise<ApiResponse> {
@@ -553,6 +774,31 @@ export class ZenosApiClient {
   async adminUnbanUser(userId: string): Promise<ApiResponse> {
     return wrap(await this.request.put(`${this.baseUrl}/api/admin/users/${userId}/unban`, {
       headers: this.authHeaders, data: {},
+    }));
+  }
+
+  async getAdminFeatureFlags(): Promise<ApiResponse> {
+    return wrap(await this.request.get(`${this.baseUrl}/api/admin/feature-flags`, { headers: this.authHeaders }));
+  }
+
+  async createAdminFeatureFlag(data: Record<string, unknown>): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/admin/feature-flags`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async updateAdminFeatureFlag(flagId: string, data: Record<string, unknown>): Promise<ApiResponse> {
+    return wrap(await this.request.put(`${this.baseUrl}/api/admin/feature-flags/${flagId}`, {
+      headers: this.authHeaders,
+      data,
+    }));
+  }
+
+  async previewAdminFeatureAnnouncement(data: Record<string, unknown>): Promise<ApiResponse> {
+    return wrap(await this.request.post(`${this.baseUrl}/api/admin/feature-flags/preview-announcement`, {
+      headers: this.authHeaders,
+      data,
     }));
   }
 
