@@ -27,6 +27,9 @@
 #   E2E_TEST_AUTH_SECRET     Optional shared secret for /auth/test/token
 #   FRONTEND_URL             Default: http://localhost:5173
 #   VITE_API_BASE_URL        Default: http://127.0.0.1:8787
+#   STRICT_SKIP_GATE         true/false (default: true in CI mode, false otherwise)
+#   MAX_SKIPPED_TESTS        Max allowed skipped tests when strict gate is enabled
+#                            (default: 0)
 # =============================================================================
 
 set -euo pipefail
@@ -118,6 +121,20 @@ if [[ "$CI_MODE" == "true" ]]; then
     E2E_TEST_AUTH_SECRET="e2e-$(date +%s)-$(od -vAn -N8 -tx1 /dev/urandom | tr -d ' \n')"
     export E2E_TEST_AUTH_SECRET
   fi
+fi
+
+if [[ -z "${STRICT_SKIP_GATE:-}" ]]; then
+  if [[ "$CI_MODE" == "true" ]]; then
+    STRICT_SKIP_GATE=true
+  else
+    STRICT_SKIP_GATE=false
+  fi
+fi
+
+MAX_SKIPPED_TESTS="${MAX_SKIPPED_TESTS:-0}"
+if [[ "$STRICT_SKIP_GATE" == "true" ]] && ! [[ "$MAX_SKIPPED_TESTS" =~ ^[0-9]+$ ]]; then
+  echo "❌  MAX_SKIPPED_TESTS must be a non-negative integer (got: ${MAX_SKIPPED_TESTS})"
+  exit 1
 fi
 
 # ── Build playwright command ──────────────────────────────────────────────────
@@ -285,6 +302,7 @@ echo ""
 
 cd "${E2E_DIR}"
 EXIT_CODE=0
+SKIPPED_COUNT=0
 ERROR_PATTERN='(^\s*✘\s+[0-9]+)|(^\s*Error: )|((POST|GET|PUT|PATCH|DELETE) /api/.* failed: )|(INTERNAL_ERROR)|(SQLITE_ERROR)|(Failed to fetch)'
 
 # Stream output through two parallel greps so both log files are written
@@ -299,6 +317,15 @@ eval "$PW_CMD" 2>&1 \
 EXIT_CODE="${PIPESTATUS[0]}"
 set -e
 
+RESULTS_JSON="${E2E_DIR}/playwright-report/results.json"
+if [[ -f "${RESULTS_JSON}" ]]; then
+  if command -v jq >/dev/null 2>&1; then
+    SKIPPED_COUNT="$(jq -r '.stats.skipped // 0' "${RESULTS_JSON}" 2>/dev/null || echo 0)"
+  else
+    SKIPPED_COUNT="$(node -e "const fs=require('fs');const p='${RESULTS_JSON}';try{const j=JSON.parse(fs.readFileSync(p,'utf8'));console.log((j.stats&&typeof j.stats.skipped==='number')?j.stats.skipped:0);}catch{console.log(0);}")"
+  fi
+fi
+
 # ── Report ────────────────────────────────────────────────────────────────────
 echo ""
 if [[ $EXIT_CODE -eq 0 ]]; then
@@ -306,6 +333,13 @@ if [[ $EXIT_CODE -eq 0 ]]; then
 else
   echo "❌  Tests failed (exit code: $EXIT_CODE)"
 fi
+echo "⏭️   Skipped:     ${SKIPPED_COUNT}"
+
+if [[ "$STRICT_SKIP_GATE" == "true" ]] && [[ "${SKIPPED_COUNT}" -gt "${MAX_SKIPPED_TESTS}" ]]; then
+  echo "❌  Strict quality gate failed: skipped tests (${SKIPPED_COUNT}) exceed MAX_SKIPPED_TESTS (${MAX_SKIPPED_TESTS})"
+  EXIT_CODE=1
+fi
+
 echo "📝  Clean log:   ${RUN_LOG}"
 if [[ -s "${ERROR_LOG}" ]]; then
   echo "⚠️   Error log:   ${ERROR_LOG}"

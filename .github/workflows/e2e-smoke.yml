@@ -81,6 +81,9 @@ jobs:
       - name: Run E2E suite
         id: run_e2e
         working-directory: zenos-e2e/scripts
+        env:
+          STRICT_SKIP_GATE: "true"
+          MAX_SKIPPED_TESTS: "0"
         run: |
           set +e
           ./run-e2e.sh --ci --suite "${E2E_SUITE}"

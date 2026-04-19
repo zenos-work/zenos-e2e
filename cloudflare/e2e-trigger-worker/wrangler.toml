@@ -4,7 +4,7 @@ compatibility_date = "2026-04-07"
 workers_dev = true
 
 [triggers]
-crons = ["30 18 * * 3"]
+crons = []
 
 [vars]
 GITHUB_OWNER = "zenos-work"
@@ -12,3 +12,5 @@ GITHUB_REPO = "zenos-e2e"
 GITHUB_WORKFLOW_FILE = "e2e-smoke.yml"
 GITHUB_REF = "development"
 EMAIL_FROM = "Zenos E2E <noreply@updates.zenos.work>"
+# Note: E2E is triggered via zenos-publication-jobs on weekly newsletter run
+# This worker now serves as a manual trigger endpoint only
